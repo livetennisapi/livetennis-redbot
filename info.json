@@ -1,0 +1,6 @@
+{
+    "author": ["Live Tennis API"],
+    "description": "Cogs for Red-DiscordBot by Live Tennis API (livetennisapi.com). Currently ships LiveTennis: live tennis scores, match details and player lookups.",
+    "install_msg": "Thanks for adding the Live Tennis API repo! Use `[p]cog install livetennis-redbot livetennis` to get started.",
+    "short": "Live tennis scores cogs by livetennisapi.com"
+}
