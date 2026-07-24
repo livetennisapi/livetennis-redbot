@@ -1,0 +1,15 @@
+{
+    "author": ["Live Tennis API"],
+    "name": "LiveTennis",
+    "short": "Live tennis scores, match details and player lookups.",
+    "description": "Live ATP/WTA/Challenger/ITF/Juniors tennis scores from livetennisapi.com: live matches with per-set scores and a serving indicator, upcoming matches, results, single-match detail and player search. Query-driven (no background polling); responses are cached for 60 seconds to respect the free API tier. Requires a free API key from https://livetennisapi.com.",
+    "install_msg": "LiveTennis installed! The bot owner should set an API key with `[p]tennisset apikey <key>` (free key at <https://livetennisapi.com>), then try `[p]tennis live`.",
+    "end_user_data_statement": "This cog does not store any end user data. The bot owner's Live Tennis API key is stored using Red's shared API token storage.",
+    "min_bot_version": "3.5.0",
+    "min_python_version": [3, 8, 1],
+    "hidden": false,
+    "disabled": false,
+    "type": "COG",
+    "requirements": [],
+    "tags": ["tennis", "sports", "livescore", "scores", "atp", "wta"]
+}
