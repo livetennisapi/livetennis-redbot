@@ -1,0 +1,5 @@
+# Red-DiscordBot core and most listed cog repos format with Black at line
+# length 99; matching it keeps diffs against the ecosystem readable.
+[tool.black]
+line-length = 99
+target-version = ["py38"]

@@ -1,0 +1,9 @@
+[flake8]
+max-line-length = 99
+extend-ignore =
+    # Black owns whitespace-before-punctuation and line-break placement.
+    E203,
+    W503,
+    # Long URLs / help strings in docstrings.
+    E501
+exclude = .git,__pycache__,.pytest_cache
