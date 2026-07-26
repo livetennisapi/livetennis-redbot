@@ -1,6 +1,15 @@
 {
-    "author": ["Live Tennis API"],
-    "description": "Cogs for Red-DiscordBot by Live Tennis API (livetennisapi.com). Currently ships LiveTennis: live tennis scores, match details and player lookups.",
-    "install_msg": "Thanks for adding the Live Tennis API repo! Use `[p]cog install livetennis-redbot livetennis` to get started.",
-    "short": "Live tennis scores cogs by livetennisapi.com"
+    "name": "livetennis-redbot",
+    "author": [
+        "Live Tennis API"
+    ],
+    "short": "Live tennis scores cogs by livetennisapi.com",
+    "description": "Cogs for Red-DiscordBot published by Live Tennis API (livetennisapi.com), the vendor of the Live Tennis API. Currently ships LiveTennis: live tennis scores, match detail, fixtures and player lookups.",
+    "install_msg": "Thanks for adding the Live Tennis API repo!\nInstall the cog with `[p]cog install livetennis-redbot livetennis`, then set a free API key with `[p]set api livetennis api_key <your key>` (free key: <https://livetennisapi.com/subscribe/free>).\nIssues and suggestions: <https://github.com/livetennisapi/livetennis-redbot/issues>",
+    "tags": [
+        "tennis",
+        "sports",
+        "livescore",
+        "scores"
+    ]
 }

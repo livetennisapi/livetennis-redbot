@@ -1,15 +1,33 @@
 {
-    "author": ["Live Tennis API"],
+    "author": [
+        "Live Tennis API"
+    ],
     "name": "LiveTennis",
-    "short": "Live tennis scores, match details and player lookups.",
-    "description": "Live ATP/WTA/Challenger/ITF/Juniors tennis scores from livetennisapi.com: live matches with per-set scores and a serving indicator, upcoming matches, results, single-match detail and player search. Query-driven (no background polling); responses are cached for 60 seconds to respect the free API tier. Requires a free API key from https://livetennisapi.com.",
-    "install_msg": "LiveTennis installed! The bot owner should set an API key with `[p]tennisset apikey <key>` (free key at <https://livetennisapi.com>), then try `[p]tennis live`.",
-    "end_user_data_statement": "This cog does not store any end user data. The bot owner's Live Tennis API key is stored using Red's shared API token storage.",
+    "short": "Live tennis scores, match detail, fixtures and player lookups.",
+    "description": "Live ATP/WTA/Challenger/ITF/Juniors tennis from livetennisapi.com: live matches with per-set scores and a serving indicator, upcoming matches, the scheduled fixture list, single-match detail, a score-only fast read, player search and player profiles. An optional owner-configured score watch can post started/set/finished updates to one channel; it is off by default. Query-driven and cached for 60 seconds, and the score watch polls at most once per 120 seconds (default 300s), to respect the free API tier (30 req/min, 1,000/day). Requires a free API key from https://livetennisapi.com/subscribe/free, stored with Red's shared API tokens.",
+    "install_msg": "LiveTennis installed!\n1. Get a free API key at <https://livetennisapi.com/subscribe/free> (30 req/min, 1,000/day).\n2. The bot owner sets it with `[p]set api livetennis api_key <your key>` (run it in DM, or use `[p]set api` for the interactive flow).\n3. Try `[p]tennis live`. See `[p]tennisset apikey` for key help and `[p]help LiveTennis` for all commands.",
+    "end_user_data_statement": "This cog does not store any end user data. The bot owner's Live Tennis API key is stored using Red's shared API token storage, and the cog's own settings store only a channel ID, a tour filter and a poll interval for the optional score watch.",
     "min_bot_version": "3.5.0",
-    "min_python_version": [3, 8, 1],
+    "max_bot_version": "0.0.0",
+    "min_python_version": [
+        3,
+        8,
+        1
+    ],
     "hidden": false,
     "disabled": false,
     "type": "COG",
+    "permissions": [
+        "embed_links"
+    ],
+    "required_cogs": {},
     "requirements": [],
-    "tags": ["tennis", "sports", "livescore", "scores", "atp", "wta"]
+    "tags": [
+        "tennis",
+        "sports",
+        "livescore",
+        "scores",
+        "atp",
+        "wta"
+    ]
 }
