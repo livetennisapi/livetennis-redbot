@@ -28,8 +28,8 @@ COLOR_COMPLETED = discord.Color.dark_grey()
 COLOR_ERROR = discord.Color.red()
 
 UPGRADE_MSG = (
-    "This data requires a higher Live Tennis API tier. "
-    "See <https://livetennisapi.com> for plans."
+    "Completed-match listings need the BASIC tier ($9.99/mo) or any History "
+    "plan — upgrade at <https://livetennisapi.com/subscribe/upgrade>"
 )
 
 
@@ -299,7 +299,7 @@ class LiveTennis(commands.Cog):
                     "No Live Tennis API key is configured. The bot owner can set "
                     "one with `[p]tennisset apikey <key>` (or `[p]set api "
                     "livetennis api_key,<key>`). Get a free key at "
-                    "<https://livetennisapi.com>."
+                    "<https://livetennisapi.com/subscribe/free>."
                 )
             headers["X-API-Key"] = key
 
@@ -487,7 +487,7 @@ class LiveTennis(commands.Cog):
 
         Prefer running this in DM. You can also use the standard
         `[p]set api livetennis api_key,<key>`.
-        Get a free key at <https://livetennisapi.com>.
+        Get a free key at <https://livetennisapi.com/subscribe/free>.
         """
         if key is None:
             return await ctx.send_help()
