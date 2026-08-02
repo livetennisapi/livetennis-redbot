@@ -20,7 +20,7 @@ Live ATP / WTA / Challenger / ITF / Juniors tennis scores in Discord embeds.
 ### Setup
 
 The bot owner needs a Live Tennis API key (free tier available at
-<https://livetennisapi.com>):
+<https://livetennisapi.com/subscribe/free>):
 
 ```
 [p]tennisset apikey <key>
@@ -40,7 +40,7 @@ Set the key in a DM with the bot so it never appears in a public channel.
 |---|---|
 | `[p]tennis live [tour]` | Live matches with per-set scores, live game points and a serving indicator |
 | `[p]tennis upcoming [tour]` | Upcoming matches with start times |
-| `[p]tennis results [tour]` | Recently completed matches |
+| `[p]tennis results [tour]` | Recently completed matches — needs the BASIC tier ($9.99/mo) or any History plan; on a free key the bot replies with an upgrade note |
 | `[p]tennis match <id>` | Detail for one match (IDs are shown in list output) |
 | `[p]tennis player <name>` | Player search (name, country, ranking) |
 | `[p]tennis status` | API health check |
