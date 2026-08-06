@@ -18,8 +18,11 @@ API_BASE = "https://api.livetennisapi.com/api/public/v1"
 SERVICE_NAME = "livetennis"
 VALID_TOURS = ("atp", "wta", "challenger", "itf", "juniors")
 
-# Free tier is 30 req/min & 1000/day: cache list responses and never poll
-# faster than once per 60 seconds for the same query.
+# Free tier is 30 req/min & 100/day: cache list responses and never hit the
+# API faster than once per 60 seconds for the same query. The cog makes no
+# background requests, so quota is only spent when users run commands — but
+# on a free key a busy server can still exhaust 100/day; the Basic tier
+# (1,000/day) removes that pressure.
 CACHE_TTL = 60
 
 COLOR_LIVE = discord.Color.green()
@@ -281,7 +284,7 @@ class LiveTennis(commands.Cog):
 
         Raises :class:`ApiError` with a user-facing message on failure.
         List endpoints are cached for 60s to respect the free tier
-        (30 requests/min, 1000/day).
+        (30 requests/min, 100/day).
         """
         assert self.session is not None
         params = params or {}

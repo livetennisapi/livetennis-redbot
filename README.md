@@ -50,10 +50,13 @@ Set the key in a DM with the bot so it never appears in a public channel.
 
 ### Rate limits
 
-The free API tier allows 30 requests/minute and 1000/day. The cog is entirely
+The free API tier allows 30 requests/minute and 100/day. The cog is entirely
 query-driven — it makes **no** background requests — and caches list responses
 for 60 seconds, so identical queries within a minute cost nothing. There is
-deliberately no auto-posting/score-follow loop.
+deliberately no auto-posting/score-follow loop. Note that 100/day is easy to
+exhaust on an active server (roughly 100 distinct commands across the whole
+day); if that happens, the Basic tier ($9.99, 1,000/day) gives ten times the
+headroom.
 
 ### End user data
 
