@@ -22,3 +22,5 @@ jobs:
         run: python -m compileall -q livetennis
       - name: Validate repo and cog info.json
         run: python -c "import json; [json.load(open(f)) for f in ('info.json', 'livetennis/info.json')]"
+      - name: Truth-pin check
+        run: sh scripts/truthcheck.sh
