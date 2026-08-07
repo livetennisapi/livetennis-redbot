@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -17,6 +18,8 @@ log = logging.getLogger("red.livetennis")
 API_BASE = "https://api.livetennisapi.com/api/public/v1"
 SERVICE_NAME = "livetennis"
 VALID_TOURS = ("atp", "wta", "challenger", "itf", "juniors")
+RANKING_SYSTEMS = ("atp", "wta", "itf_jt", "itf_mt", "itf_wt")
+UPGRADE_URL = "https://livetennisapi.com/subscribe/upgrade"
 
 # Free tier is 30 req/min & 100/day: cache list responses and never hit the
 # API faster than once per 60 seconds for the same query. The cog makes no
@@ -30,10 +33,20 @@ COLOR_UPCOMING = discord.Color.blurple()
 COLOR_COMPLETED = discord.Color.dark_grey()
 COLOR_ERROR = discord.Color.red()
 
+# Per-feature 403 messages: gated commands degrade into a short upgrade note
+# in the same voice, never an error dump.
 UPGRADE_MSG = (
     "Completed-match listings need the BASIC tier ($9.99/mo) or any History "
-    "plan — upgrade at <https://livetennisapi.com/subscribe/upgrade>"
+    f"plan — upgrade at <{UPGRADE_URL}>"
 )
+H2H_UPGRADE_MSG = (
+    "Head-to-head needs the BASIC tier ($9.99/mo) or any History plan — "
+    f"upgrade at <{UPGRADE_URL}>"
+)
+RANKINGS_UPGRADE_MSG = (
+    f"Rankings listings need the PRO tier ($29.99/mo) — upgrade at <{UPGRADE_URL}>"
+)
+GENERIC_UPGRADE_MSG = f"This data needs a higher plan — upgrade at <{UPGRADE_URL}>"
 
 
 # ---------------------------------------------------------------------------
@@ -147,9 +160,8 @@ def format_players_line(match: Dict[str, Any]) -> str:
     return line
 
 
-def format_scheduled(match: Dict[str, Any]) -> str:
-    """Scheduled time as a Discord relative timestamp, if parseable."""
-    raw = match.get("scheduled_time")
+def discord_timestamp(raw: Any) -> str:
+    """ISO instant -> Discord relative timestamp, or "" when unparseable."""
     if not raw:
         return ""
     try:
@@ -158,7 +170,15 @@ def format_scheduled(match: Dict[str, Any]) -> str:
             dt = dt.replace(tzinfo=timezone.utc)
         return f"<t:{int(dt.timestamp())}:R>"
     except (ValueError, OverflowError, OSError):
-        return str(raw)
+        return ""
+
+
+def format_scheduled(match: Dict[str, Any]) -> str:
+    """Scheduled time as a Discord relative timestamp, if parseable."""
+    raw = match.get("scheduled_time")
+    if not raw:
+        return ""
+    return discord_timestamp(raw) or str(raw)
 
 
 def match_header(match: Dict[str, Any]) -> str:
@@ -226,6 +246,92 @@ def build_player_embed(player: Dict[str, Any]) -> discord.Embed:
     return embed
 
 
+def build_h2h_embed(body: Dict[str, Any]) -> discord.Embed:
+    """Embed for a ``/h2h`` body whose player fragments both resolved."""
+    players = body.get("players") or {}
+    n1 = (players.get("p1") or {}).get("name") or "Player 1"
+    n2 = (players.get("p2") or {}).get("name") or "Player 2"
+    totals = body.get("totals") or {}
+    w1 = totals.get("p1_wins") or 0
+    w2 = totals.get("p2_wins") or 0
+    meetings_total = totals.get("meetings") or 0
+    undecided = totals.get("undecided") or 0
+
+    embed = discord.Embed(title=f"{n1} vs {n2}", color=COLOR_UPCOMING)
+    if not meetings_total and not undecided:
+        embed.description = f"{n1} and {n2} have no recorded meetings."
+        return embed
+    lines = [f"**{n1} {w1} — {w2} {n2}**"]
+    lines.append(f"{meetings_total} meeting(s) with a known winner")
+    if undecided:
+        lines.append(f"{undecided} further meeting(s) with no derivable winner")
+    embed.description = "\n".join(lines)
+
+    surfaces = body.get("by_surface") or {}
+    surf_lines = [
+        f"{str(surf).title()}: {v.get('p1', 0)}–{v.get('p2', 0)}"
+        for surf, v in surfaces.items()
+        if isinstance(v, dict)
+    ]
+    if surf_lines:
+        embed.add_field(name="By surface", value="\n".join(surf_lines), inline=False)
+
+    recent = []
+    for m in (body.get("meetings") or [])[:5]:
+        if not isinstance(m, dict):
+            continue
+        where = m.get("tournament") or "Unknown tournament"
+        line = f"{m.get('date') or '?'} — {where}"
+        rnd = clean_round(where, m.get("round"))
+        if rnd:
+            line += f" ({rnd})"
+        tail = []
+        winner = {1: n1, 2: n2}.get(m.get("winner"))
+        if winner:
+            tail.append(f"{winner} won")
+        if m.get("score"):
+            tail.append(str(m["score"]))
+        outcome = str(m.get("outcome") or "").lower()
+        if outcome and outcome != "completed":
+            tail.append(f"[{outcome}]")
+        if tail:
+            line += ": " + " ".join(tail)
+        recent.append(line)
+    if recent:
+        embed.add_field(name="Recent meetings", value="\n".join(recent), inline=False)
+    embed.set_footer(
+        text="Spans the 1968–2022 results archive plus completed matches from 2023 on."
+    )
+    return embed
+
+
+def build_rankings_embed(system: str, rows: List[Dict[str, Any]]) -> discord.Embed:
+    """Embed for the top of one ``/rankings`` listing (rank-ordered rows)."""
+    shown = rows[:10]
+    embed = discord.Embed(
+        title=f"{system.upper().replace('_', ' ')} rankings — top {len(shown)}",
+        color=COLOR_UPCOMING,
+    )
+    lines = []
+    effective = None
+    for r in shown:
+        rank = r.get("rank")
+        line = f"**{rank if rank is not None else '?'}.** {r.get('player_name') or 'Unknown'}"
+        points = r.get("points")
+        if points is not None:
+            line += f" — {points:,} pts"
+        prev = r.get("previous_rank")
+        if isinstance(prev, int) and isinstance(rank, int) and prev != rank:
+            arrow = "\N{BLACK UP-POINTING TRIANGLE}" if prev > rank else "\N{BLACK DOWN-POINTING TRIANGLE}"
+            line += f" ({arrow}{abs(prev - rank)})"
+        lines.append(line)
+        effective = effective or r.get("effective_date")
+    embed.description = "\n".join(lines)
+    if effective:
+        embed.set_footer(text=f"Week of {effective}")
+    return embed
+
+
 # ---------------------------------------------------------------------------
 # The cog
 # ---------------------------------------------------------------------------
@@ -243,7 +349,7 @@ class LiveTennis(commands.Cog):
     """Live tennis scores, matches and player lookups from livetennisapi.com."""
 
     __author__ = "Live Tennis API"
-    __version__ = "1.0.0"
+    __version__ = "1.1.0"
 
     def __init__(self, bot: Red):
         self.bot = bot
@@ -279,6 +385,7 @@ class LiveTennis(commands.Cog):
         *,
         cache: bool = False,
         needs_key: bool = True,
+        upgrade_msg: str = GENERIC_UPGRADE_MSG,
     ) -> Any:
         """GET ``path`` and return the parsed JSON body.
 
@@ -319,13 +426,16 @@ class LiveTennis(commands.Cog):
                         "(unauthorized). Please check it and set it again."
                     )
                 if resp.status == 403:
-                    raise ApiError(UPGRADE_MSG)
+                    raise ApiError(upgrade_msg)
                 if resp.status == 429:
-                    retry_after = resp.headers.get("Retry-After")
-                    wait = f" Try again in {retry_after}s." if retry_after else ""
-                    raise ApiError(f"Rate limited by the Live Tennis API.{wait}")
+                    raise ApiError(self._rate_limit_message(
+                        await self._error_body(resp),
+                        resp.headers.get("Retry-After"),
+                    ))
                 if resp.status == 404:
                     raise ApiError("Not found.")
+                if resp.status == 400:
+                    raise ApiError(self._bad_request_message(await self._error_body(resp)))
                 if resp.status >= 400:
                     raise ApiError(f"The Live Tennis API returned HTTP {resp.status}.")
                 # NOTE: a Retry-After header can also appear on 200 responses;
@@ -338,6 +448,63 @@ class LiveTennis(commands.Cog):
         if cache:
             self._cache[cache_key] = (time.monotonic(), data)
         return data
+
+    @staticmethod
+    async def _error_body(resp: aiohttp.ClientResponse) -> Dict[str, Any]:
+        """Best-effort parse of an error-response body; never raises."""
+        try:
+            data = await resp.json(content_type=None)
+        except (aiohttp.ClientError, ValueError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    @staticmethod
+    def _rate_limit_message(body: Dict[str, Any], retry_after: Optional[str]) -> str:
+        """User-facing message for the three 429 shapes the API sends:
+        per-minute ``rate_limited``, daily ``rate_limited`` (``scope: "day"``,
+        with ``resets_at``), and ``abuse_throttled`` (24h block for keys that
+        chronically exceed their daily cap; carries ``retry_at_epoch``)."""
+        if body.get("error") == "abuse_throttled":
+            msg = (
+                "This API key is temporarily blocked: it massively exceeded "
+                "its daily quota (rejected requests count too). If a script "
+                "shares this key, fix its retry loop."
+            )
+            epoch = body.get("retry_at_epoch")
+            if isinstance(epoch, (int, float)):
+                msg += f" Access resumes <t:{int(epoch)}:R>."
+            return msg
+        if body.get("scope") == "day":
+            msg = "Daily request quota reached"
+            limit = body.get("limit_per_day")
+            if limit:
+                msg += f" ({limit}/day on this plan)"
+            msg += "."
+            ts = discord_timestamp(body.get("resets_at"))
+            if ts:
+                msg += f" It resets {ts}."
+            msg += f" A higher tier raises the cap: <{UPGRADE_URL}>"
+            return msg
+        wait = f" Try again in {retry_after}s." if retry_after else ""
+        return f"Rate limited by the Live Tennis API.{wait}"
+
+    @staticmethod
+    def _bad_request_message(body: Dict[str, Any]) -> str:
+        """User-facing message for a 400, surfacing ``ambiguous_name``
+        candidate lists (/h2h refuses fragments matching several players)."""
+        if body.get("error") == "ambiguous_name":
+            candidates = body.get("candidates")
+            names = ""
+            if isinstance(candidates, list):
+                names = ", ".join(str(c) for c in candidates[:8])
+            msg = "That name matches more than one player"
+            if names:
+                msg += f": {names}"
+            return msg + ". Please use a more specific name."
+        detail = body.get("detail")
+        if detail:
+            return f"The Live Tennis API rejected the request: {detail}"
+        return "The Live Tennis API rejected the request (HTTP 400)."
 
     @staticmethod
     def _unwrap(payload: Any) -> Any:
@@ -364,7 +531,8 @@ class LiveTennis(commands.Cog):
         t = self._parse_tour(tour)
         if t:
             params["tour"] = t
-        payload = await self._request("/matches", params, cache=True)
+        # Only ?status=completed is gated (BASIC+ or any History plan).
+        payload = await self._request("/matches", params, cache=True, upgrade_msg=UPGRADE_MSG)
         return self._unwrap(payload) or []
 
     # -- commands: tennis ---------------------------------------------------
@@ -464,6 +632,76 @@ class LiveTennis(commands.Cog):
             embed.description = "\n".join(lines)
             if len(players) > 10:
                 embed.set_footer(text=f"{len(players) - 10} more not shown.")
+        await ctx.send(embed=embed)
+
+    @tennis.command(name="h2h")
+    @commands.cooldown(1, 5, commands.BucketType.channel)
+    async def tennis_h2h(self, ctx: commands.Context, *, players: str):
+        """Head-to-head record between two players.
+
+        Separate the two names with `vs`:
+        `[p]tennis h2h federer vs nadal`
+
+        Spans the 1968–2022 results archive plus completed matches from
+        2023 on. Needs the BASIC tier ($9.99/mo) or any History plan; on a
+        free key the bot replies with an upgrade note.
+        """
+        parts = [
+            p.strip()
+            for p in re.split(r"\s+vs\.?\s+", players, flags=re.IGNORECASE)
+            if p.strip()
+        ]
+        if len(parts) != 2:
+            return await ctx.send(
+                "Give me two names separated by `vs`, e.g. "
+                "`federer vs nadal`."
+            )
+        if any(len(p) < 3 for p in parts):
+            return await ctx.send("Each name needs at least 3 characters.")
+        p1, p2 = parts
+        async with ctx.typing():
+            try:
+                body = await self._request(
+                    "/h2h", {"p1": p1, "p2": p2},
+                    cache=True, upgrade_msg=H2H_UPGRADE_MSG,
+                )
+            except ApiError as e:
+                return await ctx.send(embed=discord.Embed(description=e.message, color=COLOR_ERROR))
+            if not isinstance(body, dict) or not body.get("players"):
+                # 200 with null players: no player matches the fragments.
+                return await ctx.send(
+                    f"No player matches `{p1}` and/or `{p2}`."
+                )
+            embed = build_h2h_embed(body)
+        await ctx.send(embed=embed)
+
+    @tennis.command(name="rankings")
+    @commands.cooldown(1, 5, commands.BucketType.channel)
+    async def tennis_rankings(self, ctx: commands.Context, system: str = "atp"):
+        """Top 10 of an official ranking table.
+
+        Systems: atp, wta, itf_jt, itf_mt, itf_wt.
+        Needs the PRO tier ($29.99/mo); on a lower tier the bot replies
+        with an upgrade note.
+        """
+        system = system.lower().strip()
+        if system not in RANKING_SYSTEMS:
+            return await ctx.send(
+                f"Unknown system `{system}`. Valid systems: "
+                f"{', '.join(RANKING_SYSTEMS)}."
+            )
+        async with ctx.typing():
+            try:
+                payload = await self._request(
+                    "/rankings", {"system": system, "limit": 10},
+                    cache=True, upgrade_msg=RANKINGS_UPGRADE_MSG,
+                )
+            except ApiError as e:
+                return await ctx.send(embed=discord.Embed(description=e.message, color=COLOR_ERROR))
+            rows = self._unwrap(payload) or []
+            if not rows:
+                return await ctx.send("No ranking rows returned.")
+            embed = build_rankings_embed(system, rows)
         await ctx.send(embed=embed)
 
     @tennis.command(name="status")
